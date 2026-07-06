@@ -224,13 +224,53 @@
         }
     }
 
-    function createClipboardIcon(id, isRed = false) {
+    async function autoCollectStories() {
+        let addedCount = 0;
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        while (true) {
+            const url = location.href.split('?')[0];
+            if (url.includes('video')) {
+                const current = getInternalClipboard();
+                if (!current.includes(url)) {
+                    const next = [...current, url];
+                    saveInternalClipboard(next);
+                    addedCount++;
+                }
+            }
+
+            // Find the "next story" button based on user-provided characteristics
+            const nextButton = document.querySelector('button[class*="action-item"][style*="inset-inline-end: -3rem"]');
+
+            if (nextButton && nextButton.getAttribute('aria-disabled') !== 'true') {
+                nextButton.click();
+                // Wait for navigation and DOM update
+                await sleep(1000);
+            } else {
+                break;
+            }
+        }
+        showNotification(`Auto-collection finished.\nAdded ${addedCount} new URLs.`, '#ffcc00');
+    }
+
+    function createClipboardIcon(id, type = 'append') {
         const icon = document.createElement('div');
         icon.id = id;
-        icon.title = isRed ? 'Clear List & Copy Current URL' : 'Add Current URL to List';
+
+        let title = 'Add Current URL to List';
+        let color = '#fff';
+        if (type === 'clear') {
+            title = 'Clear List & Copy Current URL';
+            color = '#ff4d4f';
+        } else if (type === 'auto') {
+            title = 'Auto-collect Stories';
+            color = '#ffcc00';
+        }
+
+        icon.title = title;
         Object.assign(icon.style, {
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: isRed ? '#ff4d4f' : '#fff', opacity: '0.7', transition: 'opacity 0.2s'
+            color: color, opacity: '0.7', transition: 'opacity 0.2s'
         });
 
         icon.innerHTML = `
@@ -248,11 +288,13 @@
         icon.onclick = (e) => {
             e.stopPropagation();
             const url = location.href.split('?')[0];
-            if (isRed) {
+            if (type === 'clear') {
                 if (confirm('Are you sure you want to clear the current list and copy ONLY this URL?')) {
                     saveInternalClipboard([url]);
                     showNotification(`Cleared list and copied current URL:\n${url}\nTotal: 1`, '#ff4d4f');
                 }
+            } else if (type === 'auto') {
+                autoCollectStories();
             } else {
                 const current = getInternalClipboard();
                 if (!current.includes(url)) {
@@ -288,11 +330,13 @@
             display: 'flex', gap: '15px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px'
         });
 
-        const standardIcon = createClipboardIcon('tmk-story-append-icon', false);
-        const redIcon = createClipboardIcon('tmk-story-clear-icon', true);
+        const standardIcon = createClipboardIcon('tmk-story-append-icon', 'append');
+        const redIcon = createClipboardIcon('tmk-story-clear-icon', 'clear');
+        const autoIcon = createClipboardIcon('tmk-story-auto-icon', 'auto');
 
         container.appendChild(standardIcon);
         container.appendChild(redIcon);
+        container.appendChild(autoIcon);
         document.body.appendChild(container);
     }
 
